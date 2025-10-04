@@ -5,8 +5,10 @@ const config: CapacitorConfig = {
   appName: 'BirimbaHub',
   webDir: 'dist',
   server: {
-    url: 'https://2e87f570-4ade-4893-b4f7-e601c02f01cf.lovableproject.com?forceHideBadge=true',
-    cleartext: true
+    // Use the hosted GitHub Pages URL so the native app can load the remote SPA
+    url: 'https://kt-technologyug.github.io/birimbahub/',
+    // Pages uses HTTPS; cleartext (HTTP) is not required.
+    cleartext: false
   }
 };
 

@@ -6,7 +6,7 @@ import SupplierDashboard from '@/components/dashboards/SupplierDashboard';
 import { Loader2 } from 'lucide-react';
 
 const Dashboard = () => {
-  const { user, userRole, loading } = useAuth();
+  const { user, profile, userRole, loading } = useAuth();
 
   if (loading) {
     return (

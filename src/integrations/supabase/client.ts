@@ -7,6 +7,9 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
+// Keep runtime values private; do not expose keys or print them in production.
+// If you need to debug in development, set VITE_SHOW_SUPABASE_DEBUG=true and
+// add temporary logging in your local environment only.
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {

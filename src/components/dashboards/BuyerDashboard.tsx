@@ -6,7 +6,7 @@ import { LogOut, ShoppingCart, TrendingUp, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const BuyerDashboard = () => {
-  const { signOut } = useAuth();
+  const { signOut, profile, userRole } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -31,7 +31,12 @@ const BuyerDashboard = () => {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Welcome, Buyer!</h2>
+          {(() => {
+            const roleLabel = (userRole ?? 'buyer')[0].toUpperCase() + (userRole ?? 'buyer').slice(1);
+            return (
+              <h2 className="text-3xl font-bold mb-2">Welcome{profile?.full_name ? `, ${profile.full_name}` : ', Buyer'}! - {roleLabel}</h2>
+            );
+          })()}
           <p className="text-muted-foreground">Browse products and place orders</p>
         </div>
 

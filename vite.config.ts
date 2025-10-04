@@ -5,6 +5,9 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // When deploying to GitHub Pages under a repository path, set the base path
+  // so built assets reference the correct subpath. During development use '/'.
+  base: mode === 'production' ? '/birimbahub/' : '/',
   server: {
     host: "::",
     port: 8080,

@@ -6,7 +6,7 @@ import { LogOut, Sprout, TrendingUp, MessageSquare, DollarSign } from 'lucide-re
 import { useNavigate } from 'react-router-dom';
 
 const FarmerDashboard = () => {
-  const { signOut, user } = useAuth();
+  const { signOut, user, profile, userRole } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -31,7 +31,12 @@ const FarmerDashboard = () => {
 
       <main className="container mx-auto px-4 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">Welcome, Farmer!</h2>
+          {(() => {
+            const roleLabel = (userRole ?? 'farmer')[0].toUpperCase() + (userRole ?? 'farmer').slice(1);
+            return (
+              <h2 className="text-3xl font-bold mb-2">Welcome{profile?.full_name ? `, ${profile.full_name}` : ', Farmer'}! - {roleLabel}</h2>
+            );
+          })()}
           <p className="text-muted-foreground">Manage your farm, track expenses, and connect with buyers</p>
         </div>
 

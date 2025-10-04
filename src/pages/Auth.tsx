@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,20 +17,26 @@ const Auth = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  // Toggle debug UI via Vite env var: set VITE_SHOW_SUPABASE_DEBUG=true in .env to enable
+  const SHOW_SUPABASE_DEBUG = import.meta.env.VITE_SHOW_SUPABASE_DEBUG === 'true';
+
+  // Debug helper: show current supabase URL and test connectivity
+  // Keep debug UI off by default; enable with VITE_SHOW_SUPABASE_DEBUG if needed.
+
   const [loginData, setLoginData] = useState({ email: '', password: '' });
   const [signupData, setSignupData] = useState({
     email: '',
     password: '',
     fullName: '',
     location: '',
-    role: 'farmer' as 'farmer' | 'buyer' | 'supplier'
+    role: 'farmer' as 'farmer' | 'buyer' | 'supplier',
+    phone: ''
   });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
-    const { error } = await signIn(loginData.email, loginData.password);
+    const { error, session } = await signIn(loginData.email, loginData.password);
 
     if (error) {
       toast({
@@ -37,12 +44,24 @@ const Auth = () => {
         description: error.message,
         variant: "destructive",
       });
-    } else {
+
+      setIsLoading(false);
+      return;
+    }
+
+    // If signIn returned a session, navigate. If not, instruct the user to
+    // confirm email or wait a moment.
+    if (session) {
       toast({
         title: "Welcome back!",
         description: "You have been logged in successfully",
       });
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
+    } else {
+      toast({
+        title: 'Check your email',
+        description: 'Please confirm your email to complete sign-in (or try again).',
+      });
     }
 
     setIsLoading(false);
@@ -57,7 +76,8 @@ const Auth = () => {
       signupData.password,
       signupData.fullName,
       signupData.location,
-      signupData.role
+      signupData.role,
+      signupData.phone
     );
 
     if (error) {
@@ -71,7 +91,7 @@ const Auth = () => {
         title: "Account created!",
         description: "You can now log in with your credentials",
       });
-      navigate('/dashboard');
+      navigate('/dashboard', { replace: true });
     }
 
     setIsLoading(false);
@@ -86,6 +106,11 @@ const Auth = () => {
           </div>
           <CardTitle className="text-3xl font-bold">BirimbaHub</CardTitle>
           <CardDescription>Connecting Uganda's Agricultural Community</CardDescription>
+          {SHOW_SUPABASE_DEBUG && (
+            <div className="mt-2 text-sm text-muted-foreground">
+              <div>Supabase debug mode enabled</div>
+            </div>
+          )}
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="login">
@@ -167,6 +192,16 @@ const Auth = () => {
                     value={signupData.location}
                     onChange={(e) => setSignupData({ ...signupData, location: e.target.value })}
                     required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-phone">Phone number</Label>
+                  <Input
+                    id="signup-phone"
+                    type="tel"
+                    placeholder="+256700000000"
+                    value={signupData.phone}
+                    onChange={(e) => setSignupData({ ...signupData, phone: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">

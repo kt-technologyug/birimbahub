@@ -8,10 +8,11 @@ type UserRole = 'farmer' | 'buyer' | 'supplier' | 'admin';
 interface AuthContextType {
   user: User | null;
   session: Session | null;
+  profile: { full_name: string; phone_number?: string | null; location?: string } | null;
   userRole: UserRole | null;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, fullName: string, location: string, role: UserRole) => Promise<{ error: any }>;
+  signIn: (email: string, password: string) => Promise<{ error: any; session?: Session | null }>;
+  signUp: (email: string, password: string, fullName: string, location: string, role: UserRole, phone?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -22,6 +23,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<{ full_name: string; phone_number?: string | null; location?: string } | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -44,9 +46,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      
+
       if (session?.user) {
-        fetchUserRole(session.user.id);
+        // fetch role and profile in parallel, then clear loading
+        Promise.all([
+          fetchUserRole(session.user.id),
+          fetchUserProfile(session.user.id),
+        ]).finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
@@ -64,24 +70,77 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) {
-        console.error('Error fetching user role:', error);
+        // keep errors silent here — UI can show an appropriate toast if needed
       } else if (data) {
         setUserRole(data.role as UserRole);
       }
-    } catch (error) {
-      console.error('Error fetching user role:', error);
+    } catch (e) {
+      // swallow; no console noise in normal operation
     } finally {
-      setLoading(false);
+      // don't toggle loading here; caller controls when loading finishes
+    }
+  };
+
+  const fetchUserProfile = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('full_name, phone_number, location')
+        .eq('user_id', userId)
+        .single();
+
+      if (!error && data) {
+        setProfile({ full_name: data.full_name, phone_number: data.phone_number, location: data.location });
+      } else {
+        setProfile(null);
+      }
+    } catch (e) {
+      setProfile(null);
     }
   };
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-      return { error };
+
+      if (error) return { error };
+
+      // If the auth call returned a session/user, set them immediately.
+      if (data?.session) {
+        setSession(data.session as Session);
+        setUser(data.user ?? null);
+        if (data.user) {
+          // ensure role and profile are loaded before returning
+          await Promise.all([fetchUserRole(data.user.id), fetchUserProfile(data.user.id)]);
+        }
+        return { error: null, session: data.session };
+      }
+
+      // Some Supabase project settings don't return a session immediately
+      // (e.g. email confirmation flows). We'll poll for a short time to see
+      // if a session becomes available, to reduce the need for a second
+      // user click.
+      const start = Date.now();
+  const timeout = 6000; // ms
+      while (Date.now() - start < timeout) {
+        // small delay
+        await new Promise((res) => setTimeout(res, 200));
+        const { data: sessionData } = await supabase.auth.getSession();
+        const session = sessionData.session;
+        if (session) {
+          setSession(session);
+          setUser(session.user ?? null);
+          if (session.user) fetchUserRole(session.user.id);
+          return { error: null, session };
+        }
+      }
+
+      // No session after polling; return success with null session and let
+      // the caller decide what to do (UI may show confirmation required).
+      return { error: null, session: null };
     } catch (error: any) {
       return { error };
     }
@@ -93,6 +152,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     fullName: string,
     location: string,
     role: UserRole
+    , phone?: string
   ) => {
     try {
       const { data, error } = await supabase.auth.signUp({
@@ -103,22 +163,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           data: {
             full_name: fullName,
             location: location,
-          }
-        }
+            role: role,
+            phone: phone ?? null,
+          },
+        },
       });
 
       if (error) return { error };
       if (!data.user) return { error: new Error('User creation failed') };
 
-      // Create user role
-      const { error: roleError } = await supabase
-        .from('user_roles')
-        .insert({ user_id: data.user.id, role });
-
-      if (roleError) {
-        console.error('Error creating user role:', roleError);
-        return { error: roleError };
-      }
+      // NOTE: role creation is handled by a DB trigger (handle_new_user)
+      // which reads the role from the user's raw_user_meta_data on insert.
+      // This avoids RLS race conditions where the client isn't yet authenticated.
 
       return { error: null };
     } catch (error: any) {
@@ -129,6 +185,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUserRole(null);
+    setProfile(null);
     toast({
       title: "Signed out",
       description: "You have been signed out successfully",
@@ -145,7 +202,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [userRole]);
 
   return (
-    <AuthContext.Provider value={{ user, session, userRole, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ user, session, profile, userRole, loading, signIn, signUp, signOut }}>
       {children}
     </AuthContext.Provider>
   );

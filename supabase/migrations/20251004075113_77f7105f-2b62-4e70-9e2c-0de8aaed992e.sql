@@ -302,11 +302,12 @@ SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  INSERT INTO public.profiles (user_id, full_name, location)
+  INSERT INTO public.profiles (user_id, full_name, location, phone_number)
   VALUES (
     NEW.id,
     COALESCE(NEW.raw_user_meta_data->>'full_name', 'User'),
-    COALESCE(NEW.raw_user_meta_data->>'location', 'Uganda')
+    COALESCE(NEW.raw_user_meta_data->>'location', 'Uganda'),
+    NULLIF(TRIM(coalesce(NEW.raw_user_meta_data->>'phone', '')), '')
   );
   RETURN NEW;
 END;
