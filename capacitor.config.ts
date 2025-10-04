@@ -1,7 +1,7 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'app.lovable.2e87f5704ade4893b4f7e601c02f01cf',
+  appId: 'com.example.birimbahub',
   appName: 'BirimbaHub',
   webDir: 'dist',
   server: {
